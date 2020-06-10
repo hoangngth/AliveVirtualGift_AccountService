@@ -27,16 +27,23 @@ message CreateRequest {
 }
 
 message UpdateRequest {
-    string name = 1;
-    string email = 2;
-    string avatar = 3;
-    string password = 4;
+    string token = 1;
+    string name = 2;
+    string email = 3;
+    string avatar = 4;
+    string password = 5;
 }
 
 message ShowRequest {
-    uint64 id = 1;
+    string token = 1;
 }
 
+message ShowResponse {
+    string name = 1;
+    string email = 2;
+    string avatar = 3;
+    int64 diamond = 4;
+}
 
 // Define Account Service
 service AccountService {
@@ -44,5 +51,5 @@ service AccountService {
     rpc Logout(LogoutRequest) returns (Status);
     rpc Create(CreateRequest) returns (Status);
     rpc Update(UpdateRequest) returns (Status);
-    rpc Show(ShowRequest) returns (Status);
+    rpc Show(ShowRequest) returns (ShowResponse);
 }

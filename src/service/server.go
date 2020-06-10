@@ -77,7 +77,7 @@ func (s *serviceServer) Login(ctx context.Context, request *proto.LoginRequest) 
 
 func (s *serviceServer) Logout(ctx context.Context, request *proto.LogoutRequest) (*proto.Status, error) {
 
-	status, err := clientSessionService.DeleteToken(ctx, &proto.TokenString{
+	stat, err := clientSessionService.DeleteToken(ctx, &proto.TokenString{
 		Token: &request.GetToken(),
 	})
 	if err != nil {
@@ -85,18 +85,107 @@ func (s *serviceServer) Logout(ctx context.Context, request *proto.LogoutRequest
 	}
 
 	return &proto.Status{
-		Success: true,
+		Success: &stat.Success,
 	}, nil
 }
 
 func (s *serviceServer) Create(ctx context.Context, request *proto.CreateRequest) (*proto.Status, error) {
-	return nil, nil
+
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	hashedPassword := utils.HashAndSalt(request.GetPassword())
+	res, err := conn.ExecContext(ctx, "INSERT INTO Account (Name, Email, Username, Password) VALUES (?, ?, ?, ?)",
+		request.GetName(), request.GetEmail(), request.GetUsername(), hashedPassword)
+
+	if err != nil {
+		return nil, status.Error(codes.Unknown, "Failed to insert into Account-> "+err.Error())
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, status.Error(codes.Unknown, "Failed to retrieve id for created Account-> "+err.Error())
+	}
+	_ = id
+
+	return &proto.Status{
+		Success: true,
+	}, nil
 }
 
 func (s *serviceServer) Update(ctx context.Context, request *proto.UpdateRequest) (*proto.Status, error) {
-	return nil, nil
-}
 
-func (s *serviceServer) Show(ctx context.Context, request *proto.ShowRequest) (*proto.Status, error) {
-	return nil, nil
+	stat, err := clientSessionService.CheckToken(ctx, &proto.TokenString{
+		Token: &request.GetToken(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	accountID := clientSessionService.GetAccountIDFromToken(request.GetToken())
+	id := &accountID.Id
+	hasedPassword := utils.HashAndSalt(request.GetPassword())
+
+	res, err := conn.ExecContext(ctx, "UPDATE Account SET Name = ?, Email = ?, Avatar = ?, Password = ? WHERE  Id = ?",
+		request.GetName(), request.GetEmail(), request.GetAvatar(), hasedPassword, id)
+
+	if err != nil {
+		return nil, status.Error(codes.Unknown, "Failed to update Account-> "+err.Error())
+	}
+
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return nil, status.Error(codes.Unknown, "Failed to retrieve rows affected value-> "+err.Error())
+	}
+
+	if rows == 0 {
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("Account with ID='%d' is not found or unchanged", accountID))
+	}
+
+	return &proto.Status{
+		Success: &stat.Success,
+	}, nil
+
+func (s *serviceServer) Show(ctx context.Context, request *proto.ShowRequest) (*proto.ShowResponse, error) {
+
+	stat, err := clientSessionService.CheckToken(ctx, &proto.TokenString{
+		Token: &request.GetToken(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	accountID := clientSessionService.GetAccountIDFromToken(request.GetToken())
+	id := &accountID.Id
+
+	rows, err := conn.QueryContext(ctx, "SELECT Name, Email, Avatar, Diamond FROM Account WHERE Id = ?", id)
+	if err != nil {
+		return nil, status.Error(codes.Unknown, "Failed to select from Account-> "+err.Error())
+	}
+	defer rows.Close()
+
+	var showResponse proto.ShowResponse
+	for rows.Next() {
+		err = rows.Scan(&showResponse.Name, &showResponse.Email, &showResponse.Avatar, &showResponse.Diamond)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &showResponse, nil
 }

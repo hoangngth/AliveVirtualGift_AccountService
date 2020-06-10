@@ -20,7 +20,7 @@ message AccountType {
     Type type = 1;
 }
 
-message Payload {
+message AccountInfo {
     uint64 id = 1;
     Type type = 2;
 }
@@ -33,7 +33,7 @@ message Status {
 service SessionService {
     rpc GetAccountIDFromToken (TokenString) returns (AccountID);
     rpc GetAccountTypeFromToken (TokenString) returns (AccountType);
-    rpc CreateToken (Payload) returns (TokenString);
+    rpc CreateToken (AccountInfo) returns (TokenString);
     rpc RefreshToken (TokenString) returns (TokenString);
     rpc DeleteToken (TokenString) returns (Status);
     rpc CheckToken (TokenString) returns (Status);

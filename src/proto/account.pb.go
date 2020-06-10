@@ -22,7 +22,7 @@ It has these top-level messages:
 	TokenString
 	AccountID
 	AccountType
-	Payload
+	AccountInfo
 	Status
 */
 package proto

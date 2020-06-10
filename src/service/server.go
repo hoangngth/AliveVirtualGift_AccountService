@@ -65,7 +65,7 @@ func (s *serviceServer) Login(ctx context.Context, request *proto.LoginRequest) 
 		return nil, pwdErr
 	}
 
-	tokenString, err := clientSessionService.CreateToken(ctx, &proto.Payload{
+	tokenString, err := clientSessionService.CreateToken(ctx, &proto.AccountInfo{
 		Id:   id,
 		Type: proto.Type(proto.Type_value[string(accType)]),
 	})

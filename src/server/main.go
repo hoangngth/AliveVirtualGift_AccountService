@@ -11,11 +11,22 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
 
+func init() {
+
+	// Load environment
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+}
+
 func main() {
-	listener, err := net.Listen("tcp", ":8000")
+
+	listener, err := net.Listen("tcp", ":"+os.Getenv("ACCOUNT_SERVICE_PORT"))
 	if err != nil {
 		panic(err)
 	}
@@ -27,8 +38,10 @@ func main() {
 		return
 	}
 
-	srv := grpc.NewServer()
+	// Dial to Session Service
+	service.DialToServiceServer(os.Getenv("SESSION_SERVICE_PORT"))
 
+	srv := grpc.NewServer()
 	service := service.NewAccountServiceServer(db)
 
 	proto.RegisterAccountServiceServer(srv, service)
@@ -39,7 +52,7 @@ func main() {
 	go func() {
 		for range c {
 			// sig is a ^C, handle it
-			log.Println("Shutting down gRPC Session service server...")
+			log.Println("Shutting down gRPC Account service server...")
 
 			srv.GracefulStop()
 

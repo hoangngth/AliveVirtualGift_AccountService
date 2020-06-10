@@ -22,7 +22,7 @@ message AccountType {
 
 message Payload {
     uint64 id = 1;
-    AccountType type = 2;
+    Type type = 2;
 }
 
 message Status {

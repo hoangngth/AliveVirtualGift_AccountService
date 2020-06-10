@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
-	"strconv"
+	"fmt"
 
 	"AliveVirtualGift_AccountService/src/proto"
 	"AliveVirtualGift_AccountService/src/utils"
@@ -16,9 +16,9 @@ import (
 var clientSessionService proto.SessionServiceClient
 
 //DialToServiceServer ...
-func DialToServiceServer(port int) {
+func DialToServiceServer(port string) {
 
-	conn, err := grpc.Dial("localhost:"+strconv.Itoa(port), grpc.WithInsecure())
+	conn, err := grpc.Dial("localhost:"+port, grpc.WithInsecure())
 	if err != nil {
 		panic(err)
 	}
@@ -54,42 +54,42 @@ func (s *serviceServer) Login(ctx context.Context, request *proto.LoginRequest) 
 	var accType []uint8
 
 	for rows.Next() {
-		err = rows.Scan(&hashedPassoword, &id, &loginType)
+		err = rows.Scan(&hashedPassoword, &id, &accType)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	err := utils.ComparePasswords(hashedPassoword, request.GetPassword())
-	if err != nil {
-		return nil, err
+	pwdErr := utils.ComparePasswords(hashedPassoword, request.GetPassword())
+	if pwdErr != nil {
+		return nil, pwdErr
 	}
 
 	tokenString, err := clientSessionService.CreateToken(ctx, &proto.Payload{
-		Id: id,
-		Type: proto.Type(proto.Type_value[string(accType)])
+		Id:   id,
+		Type: proto.Type(proto.Type_value[string(accType)]),
 	})
 
 	return &proto.LoginResponse{
-		Token: &tokenString.Token,
+		Token: tokenString.Token,
 	}, nil
 }
 
-func (s *serviceServer) Logout(ctx context.Context, request *proto.LogoutRequest) (*proto.Status, error) {
+func (s *serviceServer) Logout(ctx context.Context, request *proto.LogoutRequest) (*proto.LogoutResponse, error) {
 
 	stat, err := clientSessionService.DeleteToken(ctx, &proto.TokenString{
-		Token: &request.GetToken(),
+		Token: request.GetToken(),
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &proto.Status{
-		Success: &stat.Success,
+	return &proto.LogoutResponse{
+		IsLoggedOut: stat.Success,
 	}, nil
 }
 
-func (s *serviceServer) Create(ctx context.Context, request *proto.CreateRequest) (*proto.Status, error) {
+func (s *serviceServer) Create(ctx context.Context, request *proto.CreateRequest) (*proto.CreateResponse, error) {
 
 	conn, err := s.db.Conn(ctx)
 	if err != nil {
@@ -111,15 +111,15 @@ func (s *serviceServer) Create(ctx context.Context, request *proto.CreateRequest
 	}
 	_ = id
 
-	return &proto.Status{
-		Success: true,
+	return &proto.CreateResponse{
+		IsCreated: true,
 	}, nil
 }
 
-func (s *serviceServer) Update(ctx context.Context, request *proto.UpdateRequest) (*proto.Status, error) {
+func (s *serviceServer) Update(ctx context.Context, request *proto.UpdateRequest) (*proto.UpdateResponse, error) {
 
 	stat, err := clientSessionService.CheckToken(ctx, &proto.TokenString{
-		Token: &request.GetToken(),
+		Token: request.GetToken(),
 	})
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func (s *serviceServer) Update(ctx context.Context, request *proto.UpdateRequest
 	}
 	defer conn.Close()
 
-	accountID := clientSessionService.GetAccountIDFromToken(request.GetToken())
+	accountID, err := clientSessionService.GetAccountIDFromToken(ctx, &proto.TokenString{request.GetToken()})
 	id := &accountID.Id
 	hasedPassword := utils.HashAndSalt(request.GetPassword())
 
@@ -151,14 +151,15 @@ func (s *serviceServer) Update(ctx context.Context, request *proto.UpdateRequest
 		return nil, status.Error(codes.NotFound, fmt.Sprintf("Account with ID='%d' is not found or unchanged", accountID))
 	}
 
-	return &proto.Status{
-		Success: &stat.Success,
+	return &proto.UpdateResponse{
+		IsUpdated: stat.Success,
 	}, nil
+}
 
 func (s *serviceServer) Show(ctx context.Context, request *proto.ShowRequest) (*proto.ShowResponse, error) {
 
-	stat, err := clientSessionService.CheckToken(ctx, &proto.TokenString{
-		Token: &request.GetToken(),
+	_, err := clientSessionService.CheckToken(ctx, &proto.TokenString{
+		Token: request.GetToken(),
 	})
 	if err != nil {
 		return nil, err
@@ -170,7 +171,7 @@ func (s *serviceServer) Show(ctx context.Context, request *proto.ShowRequest) (*
 	}
 	defer conn.Close()
 
-	accountID := clientSessionService.GetAccountIDFromToken(request.GetToken())
+	accountID, err := clientSessionService.GetAccountIDFromToken(ctx, &proto.TokenString{request.GetToken()})
 	id := &accountID.Id
 
 	rows, err := conn.QueryContext(ctx, "SELECT Name, Email, Avatar, Diamond FROM Account WHERE Id = ?", id)

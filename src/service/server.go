@@ -131,7 +131,9 @@ func (s *serviceServer) Update(ctx context.Context, request *proto.UpdateRequest
 	}
 	defer conn.Close()
 
-	accountID, err := clientSessionService.GetAccountIDFromToken(ctx, &proto.TokenString{request.GetToken()})
+	accountID, err := clientSessionService.GetAccountIDFromToken(ctx, &proto.TokenString{
+		Token: request.GetToken(),
+	})
 	id := &accountID.Id
 	hasedPassword := utils.HashAndSalt(request.GetPassword())
 
@@ -171,7 +173,9 @@ func (s *serviceServer) Show(ctx context.Context, request *proto.ShowRequest) (*
 	}
 	defer conn.Close()
 
-	accountID, err := clientSessionService.GetAccountIDFromToken(ctx, &proto.TokenString{request.GetToken()})
+	accountID, err := clientSessionService.GetAccountIDFromToken(ctx, &proto.TokenString{
+		Token: request.GetToken(),
+	})
 	id := &accountID.Id
 
 	rows, err := conn.QueryContext(ctx, "SELECT Name, Email, Avatar, Diamond FROM Account WHERE Id = ?", id)

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 )
@@ -30,6 +31,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	log.Print("Account Service running on port :" + os.Getenv("ACCOUNT_SERVICE_PORT"))
 
 	var newdb database.DBInfo
 	db, err := newdb.GetDB()

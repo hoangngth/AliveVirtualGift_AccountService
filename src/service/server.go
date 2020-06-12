@@ -184,7 +184,14 @@ func (s *serviceServer) Show(ctx context.Context, request *proto.ShowRequest) (*
 	}
 	defer rows.Close()
 
-	var showResponse proto.ShowResponse
+	type show struct {
+		Name    sql.NullString
+		Email   sql.NullString
+		Avatar  sql.NullString
+		Diamond sql.NullInt64
+	}
+
+	var showResponse show
 	for rows.Next() {
 		err = rows.Scan(&showResponse.Name, &showResponse.Email, &showResponse.Avatar, &showResponse.Diamond)
 		if err != nil {
@@ -192,5 +199,10 @@ func (s *serviceServer) Show(ctx context.Context, request *proto.ShowRequest) (*
 		}
 	}
 
-	return &showResponse, nil
+	return &proto.ShowResponse{
+		Name:    showResponse.Name.String,
+		Email:   showResponse.Email.String,
+		Avatar:  showResponse.Avatar.String,
+		Diamond: showResponse.Diamond.Int64,
+	}, nil
 }
